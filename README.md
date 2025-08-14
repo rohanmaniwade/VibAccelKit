@@ -15,4 +15,7 @@ composite spectra, and generates accelerated PSD profiles, with optional PSD-to-
 
 ## Installation
 ```bash
-pip install -r requirements.txt
+pip install -e .
+# optional FatigueDS-backed features:
+pip install -e .[fatigue]
+
