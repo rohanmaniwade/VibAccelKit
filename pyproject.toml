@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vibeaccelkit"
+version = "0.1.0"
+description = "Mission synthesis & vibration test acceleration (FDS/ERS/SRS, Lalanne FDS→PSD, PSD→time, validation, Plotly helpers)."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "VibeAccelKit Team" }]
+license = { text = "MIT" }
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.11",
+  "plotly>=5.20",
+]
+optional-dependencies = { fatigue = ["FatigueDS>=0.1"] }
+
+[project.urls]
+homepage = "https://github.com/your-org-or-user/VibeAccelKit"
+repository = "https://github.com/your-org-or-user/VibeAccelKit"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
