@@ -15,11 +15,13 @@ dependencies = [
   "scipy>=1.11",
   "plotly>=5.20",
 ]
-optional-dependencies = { fatigue = ["FatigueDS>=0.1"] }
+
+[project.optional-dependencies]
+fatigue = ["FatigueDS>=0.1"]
 
 [project.urls]
-homepage = "https://github.com/your-org-or-user/VibeAccelKit"
-repository = "https://github.com/your-org-or-user/VibeAccelKit"
+homepage = "https://github.com/rohanmaniwade/VibAccelKit"
+repository = "https://github.com/rohanmaniwade/VibAccelKit"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

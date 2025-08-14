@@ -7,6 +7,8 @@ from .synth import synthesize_time_from_psd
 from .validate import validate_srs_ers, validate_fds_meets_target
 from .viz import plot_fds, plot_ers, plot_srs, plot_psd
 
+__version__ = "0.1.0"
+
 __all__ = [
     "load_mat_timesignal",
     "get_fds", "get_ers",
