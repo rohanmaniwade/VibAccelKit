@@ -42,7 +42,7 @@ def _apply_log_axes(fig, logx, logy, freqs, include_end_tick=True):
         if tv:
             fig.update_xaxes(tickmode="array", tickvals=tv, ticktext=tt)
 
-def plot_fds(freqs, curves, title="FDS", logx=True, logy=True):
+def plot_fds(freqs, curves, title="FDS", logx=True, logy=True, include_end_tick=True):
     fig = go.Figure()
     for label, arr in curves.items():
         fig.add_trace(go.Scatter(x=freqs, y=arr, mode="lines", name=label))
@@ -54,7 +54,7 @@ def plot_fds(freqs, curves, title="FDS", logx=True, logy=True):
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_ers(freqs, curves, title="ERS", logx=True, logy=True):
+def plot_ers(freqs, curves, title="ERS", logx=True, logy=True, include_end_tick=True):
     fig = go.Figure()
     for label, arr in curves.items():
         fig.add_trace(go.Scatter(x=freqs, y=arr, mode="lines", name=label))
@@ -67,7 +67,7 @@ def plot_ers(freqs, curves, title="ERS", logx=True, logy=True):
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_srs(freqs, curves, title="SRS", logx=True, logy=True):
+def plot_srs(freqs, curves, title="SRS", logx=True, logy=True, include_end_tick=True):
     fig = go.Figure()
     for label, (pos, neg) in curves.items():
         fig.add_trace(go.Scatter(x=freqs, y=pos, mode="lines", name=f"{label} SRS+"))
@@ -81,7 +81,7 @@ def plot_srs(freqs, curves, title="SRS", logx=True, logy=True):
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_psd(freqs, curves, title="PSD", logx=True, logy=True):
+def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=True):
     fig = go.Figure()
     for label, psd in curves.items():
         rms = _rms_from_psd(psd, freqs)
