@@ -1,52 +1,87 @@
-# vibeaccelkit/io_ascii.py
-from __future__ import annotations
+# src/vibeaccelkit/io_ascii.py
+import re
+from io import StringIO
 import numpy as np
-from pathlib import Path
-from typing import Iterable, Tuple
+
+G0 = 9.80665  # m/s^2 per g
+
+def _is_comment(line: str) -> bool:
+    s = line.lstrip()
+    return s.startswith(("#", "%", ";", "!", "//"))
 
 def load_ascii_timesignal(
-    path: str | Path,
-    comments: Iterable[str] = ("#", "%", ";", "!", "//"),
-) -> Tuple[np.ndarray, np.ndarray, float]:
+    path: str,
+    time_col: int = 0,
+    accel_col: int = 1,
+    units: str = "auto",
+    tol_rel_dt: float = 1e-3,
+):
     """
-    Load a simple ASCII time history with the format:
-      col0 = time [s], cols 1..N = acceleration [m/s^2] (channels)
+    Load ASCII text with time and acceleration columns.
+    - Handles commas, semicolons, tabs, or whitespace as delimiters.
+    - Skips comment/header lines (starting with #, %, ;, !, //).
+    - Units:
+        units='auto' tries to detect 'mg' or 'g' in headers; otherwise assumes m/s^2.
+        units='g'   -> multiply by 9.80665
+        units='mg'  -> multiply by 9.80665/1000
+        units='m/s^2' or 'ms2' -> no change
+    - Ensures (or resamples to) uniform sampling if time spacing is slightly non-uniform.
 
-    Returns
-    -------
-    t : (n,) float64
-        Time vector in seconds.
-    A : (n, m) float64
-        Acceleration channels (m/s^2).
-    fs : float
-        Sampling rate [Hz], computed from median dt.
+    Returns: (time, accel_mps2, fs)
     """
-    path = Path(path)
-    arr = np.loadtxt(path, comments=tuple(comments))
-    if arr.ndim != 2 or arr.shape[1] < 2:
-        raise ValueError(f"{path.name}: expected at least 2 columns (time + channels). Got shape {arr.shape}.")
+    header_lines = []
+    data_lines = []
 
-    t = arr[:, 0].astype(float)
-    A = arr[:, 1:].astype(float)
+    with open(path, "r", errors="ignore") as f:
+        for line in f:
+            if not line.strip():
+                header_lines.append(line)
+                continue
+            if _is_comment(line):
+                header_lines.append(line)
+                continue
+            # normalize delimiters to spaces
+            s = line.replace(",", " ").replace(";", " ").replace("\t", " ")
+            s = re.sub(r"\s+", " ", s).strip()
+            if not s:
+                header_lines.append(line)
+                continue
+            toks = s.split(" ")
+            # must have at least two numeric columns
+            try:
+                float(toks[0]); float(toks[1])
+                data_lines.append(s)
+            except Exception:
+                header_lines.append(line)
 
+    if not data_lines:
+        raise ValueError(f"No numeric data lines found in {path}")
+
+    arr = np.loadtxt(StringIO("\n".join(data_lines)))
+    if arr.ndim == 1:  # single row?
+        arr = arr.reshape(1, -1)
+    if arr.shape[1] <= max(time_col, accel_col):
+        raise ValueError(f"Not enough columns in {path}; got {arr.shape[1]} columns")
+
+    t = arr[:, time_col].astype(float)
+    a = arr[:, accel_col].astype(float)
+
+    # Unit handling
+    header_text = " ".join(header_lines).lower()
+    if units == "auto":
+        if re.search(r"\bmg\b", header_text):
+            a = a * (G0 / 1000.0)
+        elif re.search(r"\bg\b", header_text):
+            a = a * G0
+        # elif header mentions m/s^2, do nothing
+    elif units == "g":
+        a = a * G0
+    elif units == "mg":
+        a = a * (G0 / 1000.0)
+    # else assume already m/s^2
+
+    # Ensure uniform sampling (or resample if slightly non-uniform)
     dt = np.diff(t)
-    if not np.all(dt > 0):
-        raise ValueError(f"{path.name}: non-monotonic time column.")
-    fs = float(1.0 / np.median(dt))
-
-    return t, A, fs
-
-
-def trim_by_time(t: np.ndarray, X: np.ndarray, t0: float | None, t1: float | None) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Trim time series to [t0, t1] (inclusive on both ends).
-    If t0/t1 is None, it’s left open.
-    """
-    n = len(t)
-    if n == 0:
-        return t, X
-    i0 = 0 if t0 is None else int(np.searchsorted(t, t0, side="left"))
-    i1 = n if t1 is None else int(np.searchsorted(t, t1, side="right"))
-    i0 = max(0, min(i0, n))
-    i1 = max(0, min(i1, n))
-    return t[i0:i1], X[i0:i1, :]
+    med = float(np.median(dt))
+    if med <= 0:
+        raise ValueError("Non-increasing or invalid time column.")
