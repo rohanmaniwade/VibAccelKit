@@ -94,3 +94,26 @@ def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=
         template="plotly_white")
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
+
+def plot_srs_vs_ers(f, srs_plus, ers, factor=2.0, title="SRS⁺ vs ERS (Validation)"):
+    f = np.asarray(f, float)
+    srs_plus = np.asarray(srs_plus, float)
+    ers = np.asarray(ers, float)
+
+    limit = factor * srs_plus
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=f, y=srs_plus, mode="lines", name="SRS⁺"))
+    fig.add_trace(go.Scatter(x=f, y=limit, mode="lines", name=f"{factor:g}×SRS⁺ limit", line=dict(dash="dash")))
+    fig.add_trace(go.Scatter(x=f, y=ers, mode="lines", name="ERS"))
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Frequency [Hz]",
+        yaxis_title="Acceleration [m/s²]",
+        template="plotly_white"
+    )
+    fig.update_xaxes(type="log")
+    fig.update_yaxes(type="log")
+
+    return fig
