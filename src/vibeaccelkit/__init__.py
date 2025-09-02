@@ -18,5 +18,6 @@ __all__ = [
     "synthesize_time_from_psd",
     "validate_srs_ers", "validate_fds_meets_target",
     "plot_fds", "plot_ers", "plot_srs", "plot_psd",
+    "plot_srs_vs_ers"
     
 ]
