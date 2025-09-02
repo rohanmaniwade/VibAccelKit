@@ -62,12 +62,12 @@ def plot_ers(freqs, curves, title="ERS", logx=True, logy=True, include_end_tick=
     fig.update_layout(
         title=title,
         xaxis_title="Frequency [Hz]",
-        yaxis_title="ERS",
+        yaxis_title="ERS [m/s²]",
         template="plotly_white")
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_srs(freqs, curves, title="SRS", logx=True, logy=True, include_end_tick=True):
+def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=True, include_end_tick=True):
     fig = go.Figure()
     for label, (pos, neg) in curves.items():
         fig.add_trace(go.Scatter(x=freqs, y=pos, mode="lines", name=f"{label} SRS+"))
@@ -76,7 +76,7 @@ def plot_srs(freqs, curves, title="SRS", logx=True, logy=True, include_end_tick=
     fig.update_layout(
         title=title,
         xaxis_title="Frequency [Hz]",
-        yaxis_title="SRS amplitude",
+        yaxis_title="SRS [m/s²]",
         template="plotly_white")
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
@@ -90,7 +90,7 @@ def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=
     fig.update_layout(
         title=title,
         xaxis_title="Frequency [Hz]",
-        yaxis_title="PSD [(m/s^2)^2/Hz]",
+        yaxis_title="Acceleration PSD (m/s²)²/Hz",
         template="plotly_white")
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
