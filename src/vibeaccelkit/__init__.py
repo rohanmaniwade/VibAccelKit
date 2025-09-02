@@ -1,5 +1,4 @@
 from .io_mat import load_mat_timesignal
-from .io_ascii import load_ascii_timesignal, trim_by_time
 from .fds import get_fds, get_ers
 from .srs import get_srs
 from .composite import combine_fds
@@ -11,7 +10,7 @@ from .viz import plot_fds, plot_ers, plot_srs, plot_psd, plot_srs_vs_ers
 __version__ = "0.1.0"
 
 __all__ = [
-    "load_mat_timesignal","load_ascii_timesignal", "trim_by_time",
+    "load_mat_timesignal",
     "get_fds", "get_ers",
     "get_srs",
     "combine_fds",

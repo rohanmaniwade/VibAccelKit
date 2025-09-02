@@ -4,6 +4,7 @@ pyproject.toml
 src/vibeaccelkit/__init__.py
 src/vibeaccelkit/composite.py
 src/vibeaccelkit/fds.py
+src/vibeaccelkit/io_ascii.py
 src/vibeaccelkit/io_mat.py
 src/vibeaccelkit/lalanne.py
 src/vibeaccelkit/srs.py
@@ -15,4 +16,3 @@ src/vibeaccelkit.egg-info/SOURCES.txt
 src/vibeaccelkit.egg-info/dependency_links.txt
 src/vibeaccelkit.egg-info/requires.txt
 src/vibeaccelkit.egg-info/top_level.txt
-src/vibeaccelkit/vibeaccelkit/io_ascii.py
