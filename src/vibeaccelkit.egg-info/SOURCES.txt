@@ -4,7 +4,6 @@ pyproject.toml
 src/vibeaccelkit/__init__.py
 src/vibeaccelkit/composite.py
 src/vibeaccelkit/fds.py
-src/vibeaccelkit/io_ascii.py
 src/vibeaccelkit/io_mat.py
 src/vibeaccelkit/lalanne.py
 src/vibeaccelkit/srs.py
