@@ -1,5 +1,5 @@
 from .io_mat import load_mat_timesignal
-from .fds import get_fds, get_ers
+from .fds import get_fds, get_ers, fds_from_psd, rms_from_psd
 from .srs import get_srs
 from .composite import combine_fds, fds_envelope
 from .lalanne import fds_to_psd, accelerate_psd
@@ -17,7 +17,7 @@ __all__ = [
     "fds_to_psd", "accelerate_psd",
     "synthesize_time_from_psd",
     "validate_srs_ers", "validate_fds_meets_target",
-    "plot_fds", "plot_ers", "plot_srs", "plot_psd",
+    "plot_fds", "plot_ers", "fds_from_psd", "rms_from_psd", "plot_srs", "plot_psd",
     "plot_srs_vs_ers",
     
 ]

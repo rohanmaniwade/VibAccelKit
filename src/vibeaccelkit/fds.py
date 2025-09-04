@@ -1,6 +1,10 @@
 from typing import Tuple
 import numpy as np
 
+def rms_from_psd(f: np.ndarray, G: np.ndarray) -> float:
+    """RMS from one-sided PSD using Parseval: σ^2 = ∫ G df."""
+    return float(np.sqrt(np.trapezoid(np.asarray(G, float), np.asarray(f, float))))
+
 def get_fds(signal: np.ndarray, fs: float, freq_range: tuple, damping: float,
             b: float = 7.0, C: float = 1.0, K: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -32,3 +36,66 @@ def get_ers(signal_or_psd, fs_or_freqs, freq_range_or_T, damping: float,
         sd.set_random_load((psd, freqs), unit='ms2', T=T)
     sd.get_ers()
     return sd.f0_range, sd.ers
+
+import numpy as np
+
+def fds_from_psd(
+    f: np.ndarray,
+    G: np.ndarray,
+    T: float,
+    f0: np.ndarray,
+    damp: float = 0.05,
+    b: float = 8.0,
+    C: float = 1.0,
+    K: float = 1.0,
+) -> np.ndarray:
+    """
+    Compute the Fatigue Damage Spectrum (FDS) from a ONE-SIDED acceleration PSD.
+
+    Parameters
+    ----------
+    f : (N,) array
+        Frequency axis [Hz] for G (one-sided, 0..Nyquist).
+    G : (N,) array
+        PSD [(m/s^2)^2/Hz], one-sided, aligned to `f`.
+    T : float
+        Duration [s] represented by the PSD.
+    f0 : (M,) array
+        Natural frequencies [Hz] at which to evaluate the FDS.
+    damp : float
+        Modal damping ratio ζ (e.g., 0.05 for 5%).
+    b : float
+        S-N slope exponent for damage (Lalanne b).
+    C, K : float
+        Material constants. Keep C=K=1.0 unless you deliberately use S-N data.
+
+    Returns
+    -------
+    D : (M,) array
+        FDS values (damage units) at each f0.
+    """
+    f = np.asarray(f, float)
+    G = np.asarray(G, float)
+    f0 = np.asarray(f0, float)
+
+    if f.ndim != 1 or G.ndim != 1 or f.shape[0] != G.shape[0]:
+        raise ValueError("f and G must be 1D arrays of equal length")
+    if np.any(f0 <= 0):
+        raise ValueError("All f0 must be > 0")
+
+    zeta = float(damp)
+
+    # Broadcasting: r has shape (M, N)
+    r = f0[:, None]
+    x = f[None, :] / r  # (f/f0)
+
+    # |H(jω)|^2 for SDOF acceleration response
+    H2 = 1.0 / ((1.0 - x**2)**2 + (2.0 * zeta * x)**2)
+
+    # Response variance σ^2(f0) = ∫ |H|^2 G df  (one-sided)
+    sigma2 = np.trapz(H2 * G[None, :], f[None, :], axis=1)
+    sigma = np.sqrt(np.maximum(sigma2, 0.0))
+
+    # Damage: D(f0) = K * T * sigma^b / C
+    D = K * T * (sigma**b) / C
+    return D
