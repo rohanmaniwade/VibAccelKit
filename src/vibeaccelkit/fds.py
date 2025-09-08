@@ -1,5 +1,38 @@
 from typing import Tuple
 import numpy as np
+from scipy.signal import welch
+
+def time_to_psd(signal_data, fs, freq_range, nperseg=None):
+    """
+    Compute PSD from time history using Welch's method.
+
+    Parameters
+    ----------
+    signal_data : ndarray
+        Time history signal.
+    fs : float
+        Sampling frequency [Hz].
+    freq_range : tuple
+        (fmin, fmax, df) frequency range for PSD output.
+    nperseg : int or None
+        Segment length for Welch's method (defaults: fs*2).
+
+    Returns
+    -------
+    freqs : ndarray
+        Frequency vector [Hz]
+    psd : ndarray
+        One-sided PSD [m²/s⁴/Hz]
+    """
+    fmin, fmax, df = freq_range
+    if nperseg is None:
+        nperseg = int(fs * 2)  # 2-sec segments → smoother PSD
+
+    freqs, psd = welch(signal_data, fs=fs, nperseg=nperseg)
+
+    # Restrict to desired band
+    mask = (freqs >= fmin) & (freqs <= fmax)
+    return freqs[mask], psd[mask]
 
 def rms_from_psd(f: np.ndarray, G: np.ndarray) -> float:
     """RMS from one-sided PSD using Parseval: σ^2 = ∫ G df."""
