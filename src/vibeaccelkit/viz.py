@@ -82,19 +82,30 @@ def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=Tru
     return fig
 
 def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=True):
+    import numpy as np
     from scipy.integrate import trapezoid
+    import plotly.graph_objs as go
+
     fig = go.Figure()
+    f = np.asarray(freqs, float)
+
     for label, psd in curves.items():
-        rms = float(np.sqrt(trapezoid(np.maximum(psd, 0.0), freqs)))
+        G = np.asarray(psd, float)
+        rms = float(np.sqrt(trapezoid(np.maximum(G, 0.0), f)))
+
         # PSD curve
-        fig.add_trace(go.Scatter(x=freqs, y=psd, mode="lines", name=f"{label} (RMS={rms:.2f})"))
-        # RMS horizontal line
         fig.add_trace(go.Scatter(
-            x=[freqs[0], freqs[-1]],
+            x=f, y=G, mode="lines",
+            name=f"{label} (RMS={rms:.2f})"
+        ))
+
+        # Horizontal dotted RMS line
+        fig.add_trace(go.Scatter(
+            x=[float(f[0]), float(f[-1])],
             y=[rms, rms],
             mode="lines",
             line=dict(dash="dot"),
-            name=f"{label} RMS line",
+            name=f"{label} RMS",
             showlegend=False
         ))
 
@@ -102,9 +113,11 @@ def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=
         title=title,
         xaxis_title="Frequency [Hz]",
         yaxis_title="Acceleration PSD (m/s²)²/Hz",
-        template="plotly_white")
+        template="plotly_white"
+    )
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
+
 
 def plot_srs_vs_ers(f, srs_plus, ers, factor=2.0, title="SRS⁺ vs ERS (Validation)"):
     f = np.asarray(f, float)
