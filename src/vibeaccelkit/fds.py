@@ -61,7 +61,7 @@ def get_ers(signal_or_psd, fs_or_freqs, freq_range_or_T, damping: float,
     if not from_psd:
         x, fs, freq_range = signal_or_psd, fs_or_freqs, freq_range_or_T
         sd = SpecificationDevelopment(freq_data=freq_range, damp=damping)
-        sd.set_random_load((x, 1.0/fs), unit='ms2', method='timehistory')
+        sd.set_random_load((x, 1.0/fs), unit='ms2', method='convolution')
     else:
         psd, freqs, T = signal_or_psd, fs_or_freqs, float(freq_range_or_T)
         freq_range = (float(freqs[0]), float(freqs[-1]), float(freqs[1]-freqs[0]))
