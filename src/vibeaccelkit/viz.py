@@ -81,33 +81,99 @@ def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=Tru
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_psd(freqs, curves, title="PSD", logx=True, logy=True, include_end_tick=True):
+def plot_psd(
+    freqs,
+    curves,
+    title="PSD",
+    logx=True,
+    logy=True,
+    include_end_tick=True,
+    rms_display: str = "none",   # "none" | "legend" | "flat"
+    rms_band: tuple | None = None
+):
+    """
+    Plot acceleration PSDs with optional, unit-correct RMS display modes.
+
+    Parameters
+    ----------
+    freqs : ndarray
+        Frequency vector [Hz].
+    curves : dict[str, ndarray]
+        Mapping label -> PSD [(m/s^2)^2/Hz] on 'freqs'.
+    title : str
+        Plot title.
+    logx, logy : bool
+        Log scaling toggles.
+    include_end_tick : bool
+        If True, include exact fmax tick on log-x axis helper.
+    rms_display : {"none", "legend", "flat"}
+        - "none":   show no RMS info (default, unit-safe)
+        - "legend": append RMS value (m/s^2) to the trace legend (text only)
+        - "flat":   draw a horizontal, unit-correct flat PSD line across the RMS band
+                    with level G_eq = (∫_band G df) / (fmax - fmin)
+    rms_band : (fmin, fmax) or None
+        Frequency band [Hz] over which to compute RMS/flat PSD.
+        If None, uses the full 'freqs' range.
+    """
     import numpy as np
-    from scipy.integrate import trapezoid
     import plotly.graph_objs as go
+    from scipy.integrate import trapezoid
 
-    fig = go.Figure()
     f = np.asarray(freqs, float)
+    fig = go.Figure()
 
+    # Determine RMS band
+    if rms_band is not None:
+        fmin, fmax = float(rms_band[0]), float(rms_band[1])
+    else:
+        fmin, fmax = float(f[0]), float(f[-1])
+
+    # Mask for band-limited integrals
+    m_band = (f >= fmin) & (f <= fmax)
+    if not np.any(m_band):
+        # Fallback to whole vector if band is outside
+        m_band = np.ones_like(f, dtype=bool)
+        fmin, fmax = float(f[0]), float(f[-1])
+
+    # Plot PSD curves and optionally add RMS info
     for label, psd in curves.items():
-        G = np.asarray(psd, float)
-        rms = float(np.sqrt(trapezoid(np.maximum(G, 0.0), f)))
+        psd = np.asarray(psd, float)
+        name = label
 
-        # PSD curve
-        fig.add_trace(go.Scatter(
-            x=f, y=G, mode="lines",
-            name=f"{label} (RMS={rms:.2f})"
-        ))
+        if rms_display in ("legend", "flat"):
+            # Band-limited variance: ∫ G df  → units (m/s^2)^2
+            var_band = float(trapezoid(np.maximum(psd[m_band], 0.0), f[m_band]))
+            rms_band_val = float(np.sqrt(max(var_band, 0.0)))  # m/s^2
 
-        # Horizontal dotted RMS line
-        fig.add_trace(go.Scatter(
-            x=[float(f[0]), float(f[-1])],
-            y=[rms, rms],
-            mode="lines",
-            line=dict(dash="dot"),
-            name=f"{label} RMS",
-            showlegend=False
-        ))
+            if rms_display == "legend":
+                name = f"{label} (RMS={rms_band_val:.2f} m/s²)"
+
+        # Main PSD trace
+        fig.add_trace(go.Scatter(x=f, y=psd, mode="lines", name=name))
+
+        if rms_display == "flat":
+            bw = max(fmax - fmin, 1e-30)
+            G_eq = var_band / bw  # (m/s^2)^2/Hz
+            # Draw unit-correct horizontal reference across the RMS band
+            # Use dashed line; keep legend minimal to avoid clutter
+            fig.add_trace(go.Scatter(
+                x=[fmin, fmax],
+                y=[G_eq, G_eq],
+                mode="lines",
+                line=dict(dash="dot"),
+                name=f"{label} flat PSD (RMS={rms_band_val:.2f})",
+                showlegend=False
+            ))
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Frequency [Hz]",
+        yaxis_title="Acceleration PSD (m/s²)²/Hz",
+        template="plotly_white"
+    )
+    _apply_log_axes(fig, logx, logy, f, include_end_tick)
+    return fig
+
 
     fig.update_layout(
         title=title,
