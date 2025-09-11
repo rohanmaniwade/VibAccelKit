@@ -81,49 +81,39 @@ def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=Tru
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_psd(
-    freqs,
-    curves,
-    title="PSD",
-    logx=True,
-    logy=True,
-    include_end_tick=True,
-):
+def plot_psd(freqs, psd_dict, title="Power Spectral Densities"):
     """
-    Plot acceleration PSDs.
-
-    Pass values as either:
-    - curves[label] = psd_array
-    - curves[label] = (psd_array, time_rms)  # time_rms from time history in m/s²
-
-    Only when a (psd, time_rms) tuple is provided will the legend show
-    '(... RMS=.. m/s²)'. No PSD-integrated RMS is computed here.
+    Plot PSDs. If psd_dict[label] = (PSD_array, rms_val),
+    the legend will include RMS.
     """
-    import numpy as np
-    import plotly.graph_objs as go
-
-    f = np.asarray(freqs, float)
     fig = go.Figure()
 
-    for label, val in curves.items():
-        if isinstance(val, (tuple, list)) and len(val) == 2:
-            psd = np.asarray(val[0], float)
-            time_rms = float(val[1])
-            name = f"{label} (RMS={time_rms:.2f} m/s²)"
+    for label, data in psd_dict.items():
+        # Handle tuple with RMS or plain PSD array
+        if isinstance(data, tuple) and len(data) == 2:
+            psd, rms_val = data
+            legend_label = f"{label} (RMS={rms_val:.2f})"
         else:
-            psd = np.asarray(val, float)
-            name = label
+            psd = data
+            legend_label = label
 
-        fig.add_trace(go.Scatter(x=f, y=psd, mode="lines", name=name))
+        fig.add_trace(go.Scatter(
+            x=freqs,
+            y=psd,
+            mode="lines",
+            name=legend_label
+        ))
 
     fig.update_layout(
         title=title,
         xaxis_title="Frequency [Hz]",
-        yaxis_title="Acceleration PSD (m/s²)²/Hz",
-        template="plotly_white",
+        yaxis_title="PSD [(m/s²)²/Hz]",
+        xaxis_type="log",
+        yaxis_type="log",
+        legend_title="Signals"
     )
-    _apply_log_axes(fig, logx, logy, f, include_end_tick)
     return fig
+
 
 
 
