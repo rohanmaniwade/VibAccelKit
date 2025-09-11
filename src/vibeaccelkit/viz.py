@@ -88,101 +88,43 @@ def plot_psd(
     logx=True,
     logy=True,
     include_end_tick=True,
-    rms_display: str = "none",   # "none" | "legend" | "flat"
-    rms_band: tuple | None = None
 ):
     """
-    Plot acceleration PSDs with optional, unit-correct RMS display modes.
+    Plot acceleration PSDs.
 
-    Parameters
-    ----------
-    freqs : ndarray
-        Frequency vector [Hz].
-    curves : dict[str, ndarray]
-        Mapping label -> PSD [(m/s^2)^2/Hz] on 'freqs'.
-    title : str
-        Plot title.
-    logx, logy : bool
-        Log scaling toggles.
-    include_end_tick : bool
-        If True, include exact fmax tick on log-x axis helper.
-    rms_display : {"none", "legend", "flat"}
-        - "none":   show no RMS info (default, unit-safe)
-        - "legend": append RMS value (m/s^2) to the trace legend (text only)
-        - "flat":   draw a horizontal, unit-correct flat PSD line across the RMS band
-                    with level G_eq = (∫_band G df) / (fmax - fmin)
-    rms_band : (fmin, fmax) or None
-        Frequency band [Hz] over which to compute RMS/flat PSD.
-        If None, uses the full 'freqs' range.
+    Pass values as either:
+    - curves[label] = psd_array
+    - curves[label] = (psd_array, time_rms)  # time_rms from time history in m/s²
+
+    Only when a (psd, time_rms) tuple is provided will the legend show
+    '(... RMS=.. m/s²)'. No PSD-integrated RMS is computed here.
     """
     import numpy as np
     import plotly.graph_objs as go
-    from scipy.integrate import trapezoid
 
     f = np.asarray(freqs, float)
     fig = go.Figure()
 
-    # Determine RMS band
-    if rms_band is not None:
-        fmin, fmax = float(rms_band[0]), float(rms_band[1])
-    else:
-        fmin, fmax = float(f[0]), float(f[-1])
+    for label, val in curves.items():
+        if isinstance(val, (tuple, list)) and len(val) == 2:
+            psd = np.asarray(val[0], float)
+            time_rms = float(val[1])
+            name = f"{label} (RMS={time_rms:.2f} m/s²)"
+        else:
+            psd = np.asarray(val, float)
+            name = label
 
-    # Mask for band-limited integrals
-    m_band = (f >= fmin) & (f <= fmax)
-    if not np.any(m_band):
-        # Fallback to whole vector if band is outside
-        m_band = np.ones_like(f, dtype=bool)
-        fmin, fmax = float(f[0]), float(f[-1])
-
-    # Plot PSD curves and optionally add RMS info
-    for label, psd in curves.items():
-        psd = np.asarray(psd, float)
-        name = label
-
-        if rms_display in ("legend", "flat"):
-            # Band-limited variance: ∫ G df  → units (m/s^2)^2
-            var_band = float(trapezoid(np.maximum(psd[m_band], 0.0), f[m_band]))
-            rms_band_val = float(np.sqrt(max(var_band, 0.0)))  # m/s^2
-
-            if rms_display == "legend":
-                name = f"{label} (RMS={rms_band_val:.2f} m/s²)"
-
-        # Main PSD trace
         fig.add_trace(go.Scatter(x=f, y=psd, mode="lines", name=name))
-
-        if rms_display == "flat":
-            bw = max(fmax - fmin, 1e-30)
-            G_eq = var_band / bw  # (m/s^2)^2/Hz
-            # Draw unit-correct horizontal reference across the RMS band
-            # Use dashed line; keep legend minimal to avoid clutter
-            fig.add_trace(go.Scatter(
-                x=[fmin, fmax],
-                y=[G_eq, G_eq],
-                mode="lines",
-                line=dict(dash="dot"),
-                name=f"{label} flat PSD (RMS={rms_band_val:.2f})",
-                showlegend=False
-            ))
 
     fig.update_layout(
         title=title,
         xaxis_title="Frequency [Hz]",
         yaxis_title="Acceleration PSD (m/s²)²/Hz",
-        template="plotly_white"
+        template="plotly_white",
     )
     _apply_log_axes(fig, logx, logy, f, include_end_tick)
     return fig
 
-
-    fig.update_layout(
-        title=title,
-        xaxis_title="Frequency [Hz]",
-        yaxis_title="Acceleration PSD (m/s²)²/Hz",
-        template="plotly_white"
-    )
-    _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
-    return fig
 
 
 def plot_srs_vs_ers(f, srs_plus, ers, factor=2.0, title="SRS⁺ vs ERS (Validation)"):
