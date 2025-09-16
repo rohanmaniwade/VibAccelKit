@@ -103,21 +103,14 @@ def get_ers(signal_or_psd,
             fs_or_freqs,
             freq_range_or_T,
             damping: float,
-            from_psd: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+            from_psd: bool = False,
+            k_scale: float | None = None) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Unified ERS front-end (FatigueDS-free), API-compatible with your old vak.get_ers:
+    Unified ERS front-end.
 
-    - If from_psd=False:
-        signal_or_psd : time signal (np.ndarray)
-        fs_or_freqs   : sampling rate fs [Hz]
-        freq_range_or_T: (fmin, fmax, df)
-        returns (f0, ERS_time)
-
-    - If from_psd=True:
-        signal_or_psd : PSD array G(f) [(m/s^2)^2/Hz], one-sided
-        fs_or_freqs   : frequency vector f [Hz] aligned with PSD
-        freq_range_or_T: duration T [s]
-        returns (f0, ERS_psd)   with f0 == fs_or_freqs (convention preserved)
+    Extra:
+    k_scale (float|None): optional soft scale for PSD→ERS peak factor.
+                            If None, ers_from_psd default (0.85) is used.
     """
     if not from_psd:
         x  = np.asarray(signal_or_psd, float)
@@ -130,6 +123,9 @@ def get_ers(signal_or_psd,
         G = np.asarray(signal_or_psd, float).ravel()
         f = np.asarray(fs_or_freqs,   float).ravel()
         T = float(freq_range_or_T)
-        f0 = f.copy()  # evaluate ERS on the same grid by convention
-        ers = ers_from_psd(f, G, f0, float(damping), T)
+        f0 = f.copy()
+        if k_scale is None:
+            ers = ers_from_psd(f, G, f0, float(damping), T)
+        else:
+            ers = ers_from_psd(f, G, f0, float(damping), T, k_scale=float(k_scale))
         return f0, ers
