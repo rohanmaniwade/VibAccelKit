@@ -28,26 +28,30 @@ def _Ha2_accel(f0: np.ndarray, f: np.ndarray, zeta: float) -> np.ndarray:
     numer = (w0**4) + (2.0 * zeta * w0 * w)**2
     return numer / np.maximum(denom, _EPS)
 
-def _peak_factor_vanmarcke(m0: np.ndarray, m2: np.ndarray, m4: np.ndarray, T: float) -> np.ndarray:
+def _peak_factor_vanmarcke(m0, m2, m4, T):
     """
-    Vanmarcke/Cartwright–Longuet-Higgins extreme factor from spectral moments of the
-    *acceleration* response process y(t). All arrays shape (M,).
-
-    m0 = ∫ S_yy df,  m2 = ∫ (2πf)^2 S_yy df,  m4 = ∫ (2πf)^4 S_yy df
-    ν0  = sqrt(m2/m0)/(2π)         # zero-crossing rate of y(t)
-    N   = max(ν0*T, 1)
-
-    k ≈ sqrt(2 ln N) + (γ - ln ln N)/sqrt(2 ln N), γ≈0.5772
-    Clamp to [0, ~4] to avoid blow-ups for very small N.
+    Moments-based extreme factor for the *acceleration* process y(t).
+    m0 = ∫ Syy df, m2 = ∫ (2πf)^2 Syy df, m4 = ∫ (2πf)^4 Syy df
+    ν0 = sqrt(m2/m0)/(2π);  N = max(ν0 T, 1)
+    k ≈ sqrt(2 ln N) + (γ - ln ln N)/sqrt(2 ln N)
     """
     eps = 1e-30
     gamma = 0.5772156649
     nu0 = np.sqrt((m2 + eps) / (m0 + eps)) / (2*np.pi)
     N   = np.maximum(nu0 * T, 1.0 + 1e-6)
     L   = np.log(N)
-    base = np.sqrt(2*L)
+    base = np.sqrt(2.0 * L)
     k = base + (gamma - np.log(L)) / np.maximum(base, 1e-9)
     return np.clip(k, 0.0, 4.0)
+
+
+def _peak_factor_scaled(k, scale=0.85):
+    """
+    Empirical softening for finite-length, mildly narrowband cases.
+    scale ∈ [0.75, 1.0]. Start with 0.85; tune to make ERS(PSD) ≈ ERS(time).
+    """
+    return np.asarray(k) * float(scale)
+
 
 
 
@@ -63,15 +67,14 @@ def ers_from_time(signal: np.ndarray, fs: float,
     return np.maximum(srs_pos, np.abs(srs_neg))
 
 def ers_from_psd(f: np.ndarray, G: np.ndarray,
-                f0: np.ndarray, damping: float, T: float) -> np.ndarray:
+                f0: np.ndarray, damping: float, T: float,
+                k_scale: float = 0.85) -> np.ndarray:
     """
-    ERS from one-sided input PSD G(f) by:
-    1) building the absolute-acceleration response PSD via |H_a|^2
-    2) computing spectral moments m0,m2,m4 of y(t)
-    3) using a moments-based peak factor on the *acceleration* process
+    ERS from one-sided input PSD G(f) [(m/s^2)^2/Hz]:
+    1) Build acceleration response PSD: Syy = |Ha|^2 * G
+    2) Spectral moments m0, m2, m4 of y(t)
+    3) Moments-based peak factor k (Vanmarcke/CLH), then apply soft scale
     4) ERS = k * sqrt(m0)
-
-    Units: f[Hz], G[(m/s^2)^2/Hz], ERS[m/s^2].
     """
     f   = np.asarray(f,   float).ravel()
     G   = np.asarray(G,   float).ravel()
@@ -80,20 +83,20 @@ def ers_from_psd(f: np.ndarray, G: np.ndarray,
     if f.size != G.size: raise ValueError("f and G must have the same length")
     if np.any(f0 <= 0) or T <= 0: raise ValueError("f0 must be > 0 and T>0")
 
-    Ha2 = _Ha2_accel(f0, f, zeta)                   # (M,N)
-    Syy = Ha2 * G[None, :]                          # (M,N) acceleration PSD
+    Ha2 = _Ha2_accel(f0, f, zeta)                # (M,N)
+    Syy = Ha2 * G[None, :]                       # (M,N)
 
-    # Moments of acceleration response process
-    m0 = np.trapz(Syy,                      f[None, :], axis=1)                      # var(y)
-    m2 = np.trapz(( _TWO_PI * f[None, :])**2 * Syy, f[None, :], axis=1)
-    m4 = np.trapz(( _TWO_PI * f[None, :])**4 * Syy, f[None, :], axis=1)
+    m0 = np.trapezoid(Syy,                      f[None, :], axis=1)
+    m2 = np.trapezoid((2*np.pi*f[None, :])**2 * Syy, f[None, :], axis=1)
+    m4 = np.trapezoid((2*np.pi*f[None, :])**4 * Syy, f[None, :], axis=1)
 
-    sigma_y = np.sqrt(np.maximum(m0, 0.0))          # RMS of acceleration response
-    k = _peak_factor_vanmarcke(m0, m2, m4, T)       # dimensionless
+    sigma_y = np.sqrt(np.maximum(m0, 0.0))
+    k_raw   = _peak_factor_vanmarcke(m0, m2, m4, T)
+    k       = _peak_factor_scaled(k_raw, scale=k_scale)
 
     ERS = k * sigma_y
-    ERS = np.where(sigma_y < 1e-20, 0.0, ERS)       # clean tiny bins
-    return ERS
+    return np.where(sigma_y < 1e-20, 0.0, ERS)
+
 
 
 def get_ers(signal_or_psd,
