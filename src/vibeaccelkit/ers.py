@@ -24,8 +24,9 @@ def _Ha2_accel(f0: np.ndarray, f: np.ndarray, zeta: float) -> np.ndarray:
 def _peak_factor_vanmarcke(m0: np.ndarray, m2: np.ndarray, m4: np.ndarray, T: float) -> np.ndarray:
     """
     Moments-based peak factor for acceleration y(t).
-    ν0 = sqrt(m2/m0)/(2π);  N = max(ν0*T, 1);
-    k ≈ sqrt(2 ln N) + (γ - ln ln N)/sqrt(2 ln N).
+    ν0 = sqrt(m2/m0)/(2π);  N = max(ν0*T, 1)
+    k ≈ sqrt(2 ln N) + (γ - ln ln N)/sqrt(2 ln N)
+    + mild bandwidth correction using ε = 1 - m2^2/(m0*m4).
     """
     eps = 1e-30
     gamma = 0.5772156649
@@ -34,7 +35,15 @@ def _peak_factor_vanmarcke(m0: np.ndarray, m2: np.ndarray, m4: np.ndarray, T: fl
     L   = np.log(N)
     base = np.sqrt(2.0 * L)
     k = base + (gamma - np.log(L)) / np.maximum(base, 1e-9)
+
+    # ----- bw correction (tames sharp resonances just a bit)
+    eps_bw = np.clip(1.0 - (m2*m2)/np.maximum(m0*m4, eps), 0.0, 1.0)
+    theta  = np.sqrt(1.0 - 0.6*eps_bw)  # 0.6 is a safe, light moderation
+    k = theta * k
+    # -----
+
     return np.clip(k, 0.0, 4.0)
+
 
 def ers_from_time(signal: np.ndarray, fs: float, f0: np.ndarray, damping: float) -> np.ndarray:
     """ERS from a finite time history (maximax of absolute acceleration)."""
@@ -43,12 +52,12 @@ def ers_from_time(signal: np.ndarray, fs: float, f0: np.ndarray, damping: float)
     return np.maximum(srs_pos, np.abs(srs_neg))
 
 def ers_from_psd(f: np.ndarray, G: np.ndarray, f0: np.ndarray, damping: float, T: float,
-                 k_scale: float = 1.0) -> np.ndarray:
+                k_scale: float = 1.0) -> np.ndarray:
     """
     ERS from one-sided input PSD G(f) [(m/s^2)^2/Hz]:
       Syy = |Ha|^2 * G
-      σ_y = sqrt(∫Syy df)
-      k   = Vanmarcke peak factor (acceleration moments)
+    σ_y = sqrt(∫Syy df)
+    k   = Vanmarcke peak factor (acceleration moments)
       ERS = k_scale * k * σ_y
     """
     f   = np.asarray(f,   float).ravel()
