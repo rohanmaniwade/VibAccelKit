@@ -1,7 +1,9 @@
-from typing import Tuple
+from typing import Tuple, Union, Optional
 import numpy as np
+from .stats import make_freq_grid
 
-def get_srs(signal: np.ndarray, fs: float, freqs: np.ndarray, damping: float) -> Tuple[np.ndarray, np.ndarray]:
+def get_srs(signal: np.ndarray, fs: float, freqs: Union[np.ndarray, Tuple[float, float, float]], damping: float,
+            bins: str = "log", points_per_decade: int = 24, n_points: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Acceleration SRS (peak absolute *absolute-acceleration* of unit-mass SDOF)
     for a base-acceleration input using a ramp-invariant (Tuma-style) update.
@@ -11,7 +13,13 @@ def get_srs(signal: np.ndarray, fs: float, freqs: np.ndarray, damping: float) ->
         SRS_pos is the peak positive |a_abs|, SRS_neg is the peak negative |a_abs|.
         (Both are returned as absolute magnitudes for convenience.)
     """
-    omega = 2 * np.pi * np.asarray(freqs, float)
+    # Allow passing a freq_range tuple (fmin, fmax, df) to build a grid
+    if not isinstance(freqs, np.ndarray):
+        f0 = make_freq_grid(tuple(freqs), bins=bins, points_per_decade=points_per_decade, n_points=n_points)
+    else:
+        f0 = np.asarray(freqs, float)
+
+    omega = 2 * np.pi * f0
     dt = 1.0 / fs
     srs_pos = np.zeros_like(omega)
     srs_neg = np.zeros_like(omega)

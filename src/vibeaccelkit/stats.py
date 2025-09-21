@@ -38,3 +38,37 @@ def welch_psd(sig: np.ndarray, fs: float, nperseg: Optional[int] = None) -> Tupl
         return_onesided=True, scaling="density"
     )
     return f.astype(float), G.astype(float)
+
+
+def make_freq_grid(freq_range: Tuple[float, ...], bins: str = "log",
+                   points_per_decade: int = 24, n_points: Optional[int] = None) -> np.ndarray:
+    """
+    Build a frequency grid from a freq_range tuple.
+
+    freq_range may be (fmin, fmax) or (fmin, fmax, df). When `bins=='log'`
+    returns a log-spaced grid with `n_points` or computed from `points_per_decade`.
+    When `bins=='linear'` and a df is provided, returns an arange using df, else
+    uses linspace with `n_points` or a default of 1000 points.
+    """
+    fr = tuple(float(x) for x in freq_range)
+    if len(fr) < 2:
+        raise ValueError("freq_range must have at least (fmin, fmax)")
+    fmin, fmax = fr[0], fr[1]
+    if fmin <= 0 or fmax <= 0 or fmax <= fmin:
+        raise ValueError("freq_range must satisfy 0 < fmin < fmax")
+
+    if bins == "log":
+        if n_points is not None:
+            n = int(n_points)
+        else:
+            decades = np.log10(fmax) - np.log10(fmin)
+            n = int(np.round(decades * float(points_per_decade))) + 1
+        return np.logspace(np.log10(fmin), np.log10(fmax), n)
+    else:
+        # linear
+        if len(fr) >= 3:
+            df = fr[2]
+            return np.arange(fmin, fmax + 0.5 * df, df, dtype=float)
+        if n_points is not None:
+            return np.linspace(fmin, fmax, int(n_points))
+        return np.linspace(fmin, fmax, 1000)

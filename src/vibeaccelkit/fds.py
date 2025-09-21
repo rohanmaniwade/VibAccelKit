@@ -1,6 +1,80 @@
 from typing import Tuple
 import numpy as np
 from scipy.signal import welch
+import scipy.signal as sps
+from typing import Tuple, Literal
+
+try:
+    import rainflow
+    _HAS_RAINFLOW = True
+except ImportError:
+    _HAS_RAINFLOW = False
+
+# ───────── Helpers for time-domain FDS ─────────
+def _sdof_rel_disp_from_base_accel(a: np.ndarray, fs: float, f0: float, zeta: float) -> np.ndarray:
+    """
+    Simulate relative displacement z(t) of a base-excited SDOF oscillator.
+    Equation: z'' + 2ζω z' + ω^2 z = -a_base(t)
+    """
+    w = 2 * np.pi * f0
+    A = np.array([[0.0, 1.0],
+                [-w**2, -2.0*zeta*w]])
+    B = np.array([[0.0], [-1.0]])
+    C = np.array([[1.0, 0.0]])
+    D = np.array([[0.0]])
+
+    sysd = sps.cont2discrete((A, B, C, D), dt=1.0/fs, method="bilinear")
+    Ad, Bd, Cd, Dd, _ = sysd
+
+    x = np.zeros(2)
+    z = np.zeros_like(a)
+    for i, ui in enumerate(a):
+        x = Ad @ x + Bd.flatten() * ui
+        z[i] = (Cd @ x + Dd * ui).item()
+    return z
+
+
+def _rainflow_damage(z: np.ndarray, b: float) -> float:
+    if _HAS_RAINFLOW:
+        cycles = rainflow.count_cycles(z)
+        cycles = np.asarray(cycles, dtype=float)
+        rng = cycles[:, 0]   # range
+        cnt = cycles[:, -1]  # count
+    else:
+        peaks, _ = sps.find_peaks(z)
+        valleys, _ = sps.find_peaks(-z)
+        idx = np.sort(np.concatenate([peaks, valleys]))
+        rng = np.abs(np.diff(z[idx]))
+        cnt = np.full_like(rng, 0.5)
+    return float(np.sum(cnt * 2 * (rng/2.0)**b))
+
+
+# ───────── Helpers for PSD-domain FDS ─────────
+def _sdof_tf_rel_disp(f: np.ndarray, f0: float, zeta: float) -> np.ndarray:
+    w = 2 * np.pi * f
+    wn = 2 * np.pi * f0
+    H = -1.0 / (-w**2 + 2j*zeta*wn*w + wn**2)
+    return H
+
+def _spectral_moments(Sz: np.ndarray, f: np.ndarray) -> dict:
+    w = 2*np.pi*f
+    m0 = np.trapz(Sz, f)
+    m2 = np.trapz((w**2)*Sz, f)/(2*np.pi)**2
+    m4 = np.trapz((w**4)*Sz, f)/(2*np.pi)**4
+    return {"m0": m0, "m2": m2, "m4": m4}
+
+def _rice_damage_rate(sigma: float, np_: float, r: float, b: float) -> float:
+    u = np.linspace(0, 8, 2000)
+    q = (r/np.sqrt(2*np.pi))*np.exp(-u**2/2) + np.sqrt(1-r**2)*u*np.exp(-u**2/2)
+    I = np.trapz(u**b * q, u)
+    return np_ * (sigma**b) * I
+
+def _rayleigh_damage_rate(sigma: float, np_: float, b: float) -> float:
+    from scipy.special import gamma
+    Eb = (2**(b/2)) * gamma(1+b/2)
+    return np_ * (sigma**b) * Eb
+
+
 
 def time_to_psd(signal_data, fs, freq_range, nperseg=None):
     """
@@ -38,76 +112,66 @@ def rms_from_psd(f: np.ndarray, G: np.ndarray) -> float:
     """RMS from one-sided PSD using Parseval: σ^2 = ∫ G df."""
     return float(np.sqrt(np.trapezoid(np.asarray(G, float), np.asarray(f, float))))
 
-def get_fds(signal: np.ndarray, fs: float, freq_range: tuple, damping: float,
-            b: float = 7.0, C: float = 1.0, K: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
+from .stats import make_freq_grid
+
+def get_fds_time(
+    x: np.ndarray, fs: float,
+    freq_range: Tuple[float,float], damp: float,
+    *, b: float = 6.0,
+    bins: Literal["log","linear"]="log",
+    points_per_decade: int = 24,
+    n_points: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Convolution-based FDS via FatigueDS. Returns (frequencies, fds).
+    Time-history → FDS (per-second damage rate).
     """
-    from FatigueDS import SpecificationDevelopment
-    sd = SpecificationDevelopment(freq_data=freq_range, damp=damping)
-    sd.set_random_load((signal, 1.0/fs), unit='ms2', method='convolution')
-    sd.get_fds(b=b, C=C, K=K)
-    return sd.f0_range, sd.fds
+    # frequency grid
+    f0 = make_freq_grid(freq_range, bins=bins, points_per_decade=points_per_decade, n_points=n_points)
+
+    T = len(x)/fs
+    fds_rate = np.zeros_like(f0)
+
+    for j, fn in enumerate(f0):
+        z = _sdof_rel_disp_from_base_accel(x, fs, fn, damp)
+        damage = _rainflow_damage(z, b)
+        fds_rate[j] = damage/T   # normalize to per second
+    return f0, fds_rate
+
 
 import numpy as np
 
-def fds_from_psd(
-    f: np.ndarray,
-    G: np.ndarray,
-    T: float,
-    f0: np.ndarray,
-    damp: float = 0.05,
-    b: float = 8.0,
-    C: float = 1.0,
-    K: float = 1.0,
-) -> np.ndarray:
+def get_fds_psd(
+    Sa: np.ndarray, f: np.ndarray,
+    freq_range: Tuple[float,float], damp: float,
+    *, b: float = 6.0,
+    method: Literal["rice","rayleigh"]="rice",
+    bins: Literal["log","linear"]="log",
+    points_per_decade: int = 24,
+    n_points: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Compute the Fatigue Damage Spectrum (FDS) from a ONE-SIDED acceleration PSD.
-
-    Parameters
-    ----------
-    f : (N,) array
-        Frequency axis [Hz] for G (one-sided, 0..Nyquist).
-    G : (N,) array
-        PSD [(m/s^2)^2/Hz], one-sided, aligned to `f`.
-    T : float
-        Duration [s] represented by the PSD.
-    f0 : (M,) array
-        Natural frequencies [Hz] at which to evaluate the FDS.
-    damp : float
-        Modal damping ratio ζ (e.g., 0.05 for 5%).
-    b : float
-        S-N slope exponent for damage (Lalanne b).
-    C, K : float
-        Material constants. Keep C=K=1.0 unless you deliberately use S-N data.
-
-    Returns
-    -------
-    D : (M,) array
-        FDS values (damage units) at each f0.
+    PSD → FDS (per-second damage rate) via Lalanne §4.2.
     """
-    f = np.asarray(f, float)
-    G = np.asarray(G, float)
-    f0 = np.asarray(f0, float)
+    # oscillator grid
+    f0 = make_freq_grid(freq_range, bins=bins, points_per_decade=points_per_decade, n_points=n_points)
 
-    if f.ndim != 1 or G.ndim != 1 or f.shape[0] != G.shape[0]:
-        raise ValueError("f and G must be 1D arrays of equal length")
-    if np.any(f0 <= 0):
-        raise ValueError("All f0 must be > 0")
+    fds_rate = np.zeros_like(f0)
 
-    zeta = float(damp)
+    for j, fn in enumerate(f0):
+        H = _sdof_tf_rel_disp(f, fn, damp)
+        Sz = np.abs(H)**2 * Sa
 
-    # Broadcasting: r has shape (M, N)
-    r = f0[:, None]
-    x = f[None, :] / r  # (f/f0)
+        m = _spectral_moments(Sz, f)
+        sigma = np.sqrt(m["m0"])
+        np_ = np.sqrt(m["m4"]/m["m2"]) / (2*np.pi)
+        n0  = np.sqrt(m["m2"]/m["m0"]) / (2*np.pi)
+        r   = n0/np_
 
-    # |H(jω)|^2 for SDOF acceleration response
-    H2 = 1.0 / ((1.0 - x**2)**2 + (2.0 * zeta * x)**2)
+        if method=="rice":
+            fds_rate[j] = _rice_damage_rate(sigma, np_, r, b)
+        elif method=="rayleigh":
+            fds_rate[j] = _rayleigh_damage_rate(sigma, np_, b)
+        else:
+            raise ValueError(f"Unknown method {method}")
+    return f0, fds_rate
 
-    # Response variance σ^2(f0) = ∫ |H|^2 G df  (one-sided)
-    sigma2 = np.trapz(H2 * G[None, :], f[None, :], axis=1)
-    sigma = np.sqrt(np.maximum(sigma2, 0.0))
-
-    # Damage: D(f0) = K * T * sigma^b / C
-    D = K * T * (sigma**b) / C
-    return D
