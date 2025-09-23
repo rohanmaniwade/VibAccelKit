@@ -140,6 +140,25 @@ def get_fds_time(
 
 import numpy as np
 
+def get_fds(
+    x: np.ndarray, fs: float,
+    freq_range: Tuple[float, float], damp: float,
+    *, b: float = 6.0,
+    bins: Literal["log", "linear"] = "log",
+    points_per_decade: int = 24,
+    n_points: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Backward-compatible convenience wrapper for time-history → FDS.
+    Defaults to log-spaced bins for smooth log-scale plotting.
+
+    Parameters mirror get_fds_time with the same defaults.
+    """
+    return get_fds_time(
+        x, fs, freq_range, damp,
+        b=b, bins=bins, points_per_decade=points_per_decade, n_points=n_points,
+    )
+
 def get_fds_psd(
     Sa: np.ndarray, f: np.ndarray,
     freq_range: Tuple[float,float], damp: float,
@@ -174,4 +193,20 @@ def get_fds_psd(
         else:
             raise ValueError(f"Unknown method {method}")
     return f0, fds_rate
+
+# Compatibility alias (older scripts called fds_from_psd)
+def fds_from_psd(
+    Sa: np.ndarray, f: np.ndarray,
+    freq_range: Tuple[float, float], damp: float,
+    *, b: float = 6.0,
+    method: Literal["rice", "rayleigh"] = "rice",
+    bins: Literal["log", "linear"] = "log",
+    points_per_decade: int = 24,
+    n_points: int | None = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    return get_fds_psd(
+        Sa, f, freq_range, damp,
+        b=b, method=method, bins=bins,
+        points_per_decade=points_per_decade, n_points=n_points,
+    )
 
