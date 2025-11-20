@@ -109,7 +109,10 @@ def time_to_psd(signal_data, fs, freq_range, nperseg=None):
     return freqs[mask], psd[mask]
 
 def rms_from_psd(f: np.ndarray, G: np.ndarray) -> float:
-    """RMS from one-sided PSD using Parseval: σ^2 = ∫ G df."""
+    """
+    RMS from one-sided PSD using Parseval: σ^2 = ∫ G df.
+    Units preserved (e.g., if G is in (m/s²)²/Hz, returns RMS in m/s²).
+    """
     return float(np.sqrt(np.trapezoid(np.asarray(G, float), np.asarray(f, float))))
 
 from .stats import make_freq_grid

@@ -5,7 +5,10 @@ import scipy.signal as sps
 from typing import Optional, Tuple
 
 def time_rms(x: np.ndarray, demean: bool = True) -> float:
-    """Root-mean-square of a time signal. If demean=True, removes DC first."""
+    """
+    Root-mean-square of a time signal. If demean=True, removes DC first.
+    Units preserved (e.g., if x is in m/s², returns RMS in m/s²).
+    """
     x = np.asarray(x, float)
     if demean:
         x = x - np.mean(x)

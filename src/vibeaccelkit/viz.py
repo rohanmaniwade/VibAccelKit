@@ -43,6 +43,24 @@ def _apply_log_axes(fig, logx, logy, freqs, include_end_tick=True):
             fig.update_xaxes(tickmode="array", tickvals=tv, ticktext=tt)
 
 def plot_fds(freqs, curves, title="FDS", logx=True, logy=True, include_end_tick=True):
+    """
+    Plot Fatigue Damage Spectrum (FDS).
+    
+    Parameters
+    ----------
+    freqs : array-like
+        Frequency values [Hz]
+    curves : dict
+        Dictionary of {label: FDS_array}
+    title : str
+        Plot title
+    logx : bool
+        Use logarithmic x-axis
+    logy : bool
+        Use logarithmic y-axis
+    include_end_tick : bool
+        Include endpoint frequency on x-axis
+    """
     fig = go.Figure()
     for label, arr in curves.items():
         fig.add_trace(go.Scatter(x=freqs, y=arr, mode="lines", name=label))
@@ -54,10 +72,39 @@ def plot_fds(freqs, curves, title="FDS", logx=True, logy=True, include_end_tick=
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_ers(freqs, curves, title="ERS", logx=True, logy=True, include_end_tick=True):
+def plot_ers(freqs, curves, title="ERS", logx=True, logy=True, include_end_tick=True, show_peak=False):
+    """
+    Plot Energy Response Spectrum (ERS).
+    
+    Parameters
+    ----------
+    freqs : array-like
+        Frequency values [Hz]
+    curves : dict
+        Dictionary of {label: ERS_array} or {label: (ERS_array, peak_val)}
+    title : str
+        Plot title
+    logx : bool
+        Use logarithmic x-axis
+    logy : bool
+        Use logarithmic y-axis
+    include_end_tick : bool
+        Include endpoint frequency on x-axis
+    show_peak : bool
+        If True, displays peak values in legend (default: False)
+    """
     fig = go.Figure()
-    for label, arr in curves.items():
-        fig.add_trace(go.Scatter(x=freqs, y=arr, mode="lines", name=label))
+    for label, data in curves.items():
+        # Handle tuple with peak value or plain array
+        if isinstance(data, tuple) and len(data) == 2:
+            arr, peak_val = data
+            legend_label = f"{label} (peak={peak_val:.3g} m/s²)" if show_peak else label
+        else:
+            arr = data
+            peak_val = np.max(np.abs(arr)) if len(arr) > 0 else 0.0
+            legend_label = f"{label} (peak={peak_val:.3g} m/s²)" if show_peak else label
+        
+        fig.add_trace(go.Scatter(x=freqs, y=arr, mode="lines", name=legend_label))
 
     fig.update_layout(
         title=title,
@@ -67,11 +114,37 @@ def plot_ers(freqs, curves, title="ERS", logx=True, logy=True, include_end_tick=
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=True, include_end_tick=True):
+def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=True, include_end_tick=True, show_peak=False):
+    """
+    Plot Shock Response Spectrum (SRS).
+    
+    Parameters
+    ----------
+    freqs : array-like
+        Frequency values [Hz]
+    curves : dict
+        Dictionary of {label: (SRS_pos, SRS_neg)}
+    title : str
+        Plot title
+    logx : bool
+        Use logarithmic x-axis
+    logy : bool
+        Use logarithmic y-axis
+    include_end_tick : bool
+        Include endpoint frequency on x-axis
+    show_peak : bool
+        If True, displays peak values in legend (default: False)
+    """
     fig = go.Figure()
     for label, (pos, neg) in curves.items():
-        fig.add_trace(go.Scatter(x=freqs, y=pos, mode="lines", name=f"{label} SRS+"))
-        fig.add_trace(go.Scatter(x=freqs, y=neg, mode="lines", name=f"{label} SRS-"))
+        peak_pos = np.max(np.abs(pos)) if len(pos) > 0 else 0.0
+        peak_neg = np.max(np.abs(neg)) if len(neg) > 0 else 0.0
+        
+        label_pos = f"{label} SRS+ (peak={peak_pos:.3g} m/s²)" if show_peak else f"{label} SRS+"
+        label_neg = f"{label} SRS- (peak={peak_neg:.3g} m/s²)" if show_peak else f"{label} SRS-"
+        
+        fig.add_trace(go.Scatter(x=freqs, y=pos, mode="lines", name=label_pos))
+        fig.add_trace(go.Scatter(x=freqs, y=neg, mode="lines", name=label_neg))
 
     fig.update_layout(
         title=title,
@@ -81,10 +154,21 @@ def plot_srs(freqs, curves, title="Shock Response Spectrum", logx=True, logy=Tru
     _apply_log_axes(fig, logx, logy, freqs, include_end_tick)
     return fig
 
-def plot_psd(freqs, psd_dict, title="Power Spectral Densities"):
+def plot_psd(freqs, psd_dict, title="Power Spectral Densities", rms_unit="m/s²"):
     """
     Plot PSDs. If psd_dict[label] = (PSD_array, rms_val),
-    the legend will include RMS.
+    the legend will include RMS with units.
+    
+    Parameters
+    ----------
+    freqs : array-like
+        Frequency values [Hz]
+    psd_dict : dict
+        Dictionary of {label: PSD_array} or {label: (PSD_array, rms_val)}
+    title : str
+        Plot title
+    rms_unit : str
+        Unit string for RMS values (default: "m/s²")
     """
     fig = go.Figure()
 
@@ -92,7 +176,7 @@ def plot_psd(freqs, psd_dict, title="Power Spectral Densities"):
         # Handle tuple with RMS or plain PSD array
         if isinstance(data, tuple) and len(data) == 2:
             psd, rms_val = data
-            legend_label = f"{label} (RMS={rms_val:.2f})"
+            legend_label = f"{label} (RMS={rms_val:.3g} {rms_unit})"
         else:
             psd = data
             legend_label = label

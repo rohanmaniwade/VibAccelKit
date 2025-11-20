@@ -89,12 +89,16 @@ def main():
         fds = fds_comp = psd_eq = psd_acc = ers_acc = None
 
     # --- 6) Plots ---
-    vak.plot_psd(f0, {"PSD (design)": psd}).show()
+    rms_design = vak.psd_rms(f0, psd)
+    vak.plot_psd(f0, {"PSD (design)": (psd, rms_design)}).show()
     vak.plot_srs(f0, {"Synth signal": (srs_pos, srs_neg)}).show()
     try:
         if fds is not None:
             vak.plot_fds(f0, {"FDS (from time)": fds, "Composite FDS": fds_comp}).show()
-            vak.plot_psd(f0, {"PSD_eq (from FDS)": psd_eq, "PSD_acc": psd_acc}).show()
+            vak.plot_psd(f0, {
+                "PSD_eq (from FDS)": (psd_eq, rms_eq),
+                "PSD_acc": (psd_acc, rms_acc)
+            }).show()
             vak.plot_ers(f0, {"ERS (from PSD_acc)": ers_acc}).show()
     except NameError:
         pass
