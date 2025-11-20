@@ -176,7 +176,7 @@ def plot_psd(freqs, psd_dict, title="Power Spectral Densities", rms_unit="m/s²"
         # Handle tuple with RMS or plain PSD array
         if isinstance(data, tuple) and len(data) == 2:
             psd, rms_val = data
-            legend_label = f"{label} (RMS={rms_val:.3g} {rms_unit})"
+            legend_label = f"{label} (RMS={rms_val:.3g} m/s²)"
         else:
             psd = data
             legend_label = label
